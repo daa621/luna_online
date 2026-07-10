@@ -5,6 +5,27 @@ import type { StructuredAiResponse } from '@/lib/game/types';
 
 const jsonValueSchema: z.ZodType<unknown> = z.lazy(() => z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]));
 const imageRequestSchema = z.object({ shouldGenerate: z.boolean(), prompt: z.string().optional(), involvedCharacterIds: z.array(z.string()).optional(), location: z.string().optional(), timeOfDay: z.string().optional(), sceneSummary: z.string().optional() });
+
+export function cleanAiJsonContent(content: string): string {
+  let cleaned = content.trim();
+  const fenced = cleaned.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fenced?.[1]) cleaned = fenced[1].trim();
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace >= 0 && lastBrace > firstBrace) cleaned = cleaned.slice(firstBrace, lastBrace + 1).trim();
+  return cleaned;
+}
+
+function parseAiJsonContent<T>(content: string, parse: (value: unknown) => T, label: string): T {
+  const cleaned = cleanAiJsonContent(content);
+  try {
+    return parse(JSON.parse(cleaned));
+  } catch (err) {
+    const preview = cleaned.length > 500 ? `${cleaned.slice(0, 500)}…` : cleaned;
+    throw new Error(`${label} ist kein gültiges JSON im erwarteten Format: ${err instanceof Error ? err.message : 'Unbekannter Parserfehler'}. Bereinigter Inhalt: ${preview}`);
+  }
+}
+
 const responseSchema = z.object({
   storyText: z.string(),
   events: z.array(z.unknown()).optional(),
@@ -56,11 +77,7 @@ export class OpenAiCompatibleChatProvider implements ChatProvider {
     });
     if (!response.ok) throw new Error(`KI-Anfrage fehlgeschlagen (${response.status}): ${await response.text()}`);
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    try {
-      return responseSchema.parse(JSON.parse(data.choices?.[0]?.message?.content ?? '{}')) as StructuredAiResponse;
-    } catch (err) {
-      throw new Error(`KI-Antwort ist kein gültiges JSON im erwarteten Format: ${err instanceof Error ? err.message : 'Unbekannter Parserfehler'}`);
-    }
+    return parseAiJsonContent(data.choices?.[0]?.message?.content ?? '{}', (value) => responseSchema.parse(value) as StructuredAiResponse, 'KI-Antwort');
   }
   async finalizeStory(request: FinalizeStoryRequest): Promise<StructuredAiResponse> {
     const response = await fetch(this.chatUrl(), {
@@ -69,11 +86,7 @@ export class OpenAiCompatibleChatProvider implements ChatProvider {
     });
     if (!response.ok) throw new Error(`KI-Finalisierung fehlgeschlagen (${response.status}): ${await response.text()}`);
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    try {
-      return responseSchema.pick({ storyText: true }).parse(JSON.parse(data.choices?.[0]?.message?.content ?? '{}')) as StructuredAiResponse;
-    } catch (err) {
-      throw new Error(`Finale KI-Antwort ist kein gültiges JSON im erwarteten Format: ${err instanceof Error ? err.message : 'Unbekannter Parserfehler'}`);
-    }
+    return parseAiJsonContent(data.choices?.[0]?.message?.content ?? '{}', (value) => responseSchema.pick({ storyText: true }).parse(value) as StructuredAiResponse, 'Finale KI-Antwort');
   }
 }
 
