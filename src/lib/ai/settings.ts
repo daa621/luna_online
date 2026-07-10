@@ -3,7 +3,7 @@ import type { ChatProviderConfig } from './types';
 export type AiProviderKind = 'mock' | 'openai-compatible';
 export interface AiSettings extends ChatProviderConfig { provider: AiProviderKind; }
 
-export const lmStudioDefaults: AiSettings = { provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: process.env.NEXT_PUBLIC_OPENAI_COMPAT_MODEL ?? '', apiKey: process.env.NEXT_PUBLIC_OPENAI_COMPAT_API_KEY ?? '' };
+export const lmStudioDefaults: AiSettings = { provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: process.env.NEXT_PUBLIC_OPENAI_COMPAT_MODEL ?? '', apiKey: process.env.NEXT_PUBLIC_OPENAI_COMPAT_API_KEY ?? '', responseFormatType: 'text' };
 export const mockDefaults: AiSettings = { provider: 'mock', model: 'mock-storyteller' };
 
 export function createDefaultAiSettings(): AiSettings {

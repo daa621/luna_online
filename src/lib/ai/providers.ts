@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { buildStoryPrompt } from './prompt';
-import type { ChatProvider, ChatProviderConfig, FinalizeStoryRequest, StoryTurnRequest } from './types';
+import type { ChatProvider, ChatProviderConfig, ChatResponseFormatType, FinalizeStoryRequest, StoryTurnRequest } from './types';
 import type { StructuredAiResponse } from '@/lib/game/types';
 
 const jsonValueSchema: z.ZodType<unknown> = z.lazy(() => z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]));
@@ -43,10 +43,16 @@ export class OpenAiCompatibleChatProvider implements ChatProvider {
     if (baseUrl.startsWith('/')) return baseUrl;
     return `${baseUrl.replace(/\/$/, '')}/chat/completions`;
   }
+  private responseFormatType(): ChatResponseFormatType {
+    const baseUrl = this.config.baseUrl?.trim();
+    if (this.config.responseFormatType) return this.config.responseFormatType;
+    if (!baseUrl || baseUrl.includes('localhost:1234') || baseUrl.includes('127.0.0.1:1234')) return 'text';
+    return 'json_object';
+  }
   async continueStory(request: StoryTurnRequest): Promise<StructuredAiResponse> {
     const response = await fetch(this.chatUrl(), {
       method: 'POST', headers: this.headers(),
-      body: JSON.stringify({ model: this.model(), response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Du bist eine RPG-Spielleitung. Liefere valides JSON mit storyText und events. Bestimme keine Würfelergebnisse selbst.' }, { role: 'user', content: buildStoryPrompt(request.game, request.playerText) }] }),
+      body: JSON.stringify({ model: this.model(), response_format: { type: this.responseFormatType() }, messages: [{ role: 'system', content: 'Du bist eine RPG-Spielleitung. Liefere valides JSON mit storyText und events. Bestimme keine Würfelergebnisse selbst.' }, { role: 'user', content: buildStoryPrompt(request.game, request.playerText) }] }),
     });
     if (!response.ok) throw new Error(`KI-Anfrage fehlgeschlagen (${response.status}): ${await response.text()}`);
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
@@ -59,7 +65,7 @@ export class OpenAiCompatibleChatProvider implements ChatProvider {
   async finalizeStory(request: FinalizeStoryRequest): Promise<StructuredAiResponse> {
     const response = await fetch(this.chatUrl(), {
       method: 'POST', headers: this.headers(),
-      body: JSON.stringify({ model: this.model(), response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Formuliere den endgültigen Storytext nach den bereits ausgewerteten Würfeln und Regelereignissen. Liefere JSON mit storyText.' }, { role: 'user', content: `Spielerhandlung: ${request.playerText}\nEntwurf: ${request.draft.storyText}\nSkill Checks: ${JSON.stringify(request.skillChecks)}\nAuswirkungen: ${JSON.stringify(request.effects)}\nUngültige Events: ${JSON.stringify(request.invalidEvents)}` }] }),
+      body: JSON.stringify({ model: this.model(), response_format: { type: this.responseFormatType() }, messages: [{ role: 'system', content: 'Formuliere den endgültigen Storytext nach den bereits ausgewerteten Würfeln und Regelereignissen. Liefere JSON mit storyText.' }, { role: 'user', content: `Spielerhandlung: ${request.playerText}\nEntwurf: ${request.draft.storyText}\nSkill Checks: ${JSON.stringify(request.skillChecks)}\nAuswirkungen: ${JSON.stringify(request.effects)}\nUngültige Events: ${JSON.stringify(request.invalidEvents)}` }] }),
     });
     if (!response.ok) throw new Error(`KI-Finalisierung fehlgeschlagen (${response.status}): ${await response.text()}`);
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
@@ -73,6 +79,6 @@ export class OpenAiCompatibleChatProvider implements ChatProvider {
 
 export function createChatProvider(config?: ChatProviderConfig): ChatProvider {
   const provider = config?.provider ?? process.env.NEXT_PUBLIC_AI_PROVIDER ?? 'mock';
-  if (provider === 'openai-compatible') return new OpenAiCompatibleChatProvider({ provider, baseUrl: config?.baseUrl ?? process.env.NEXT_PUBLIC_OPENAI_COMPAT_BASE_URL, apiKey: config?.apiKey ?? process.env.NEXT_PUBLIC_OPENAI_COMPAT_API_KEY, model: config?.model ?? process.env.NEXT_PUBLIC_OPENAI_COMPAT_MODEL });
+  if (provider === 'openai-compatible') return new OpenAiCompatibleChatProvider({ provider, baseUrl: config?.baseUrl ?? process.env.NEXT_PUBLIC_OPENAI_COMPAT_BASE_URL, apiKey: config?.apiKey ?? process.env.NEXT_PUBLIC_OPENAI_COMPAT_API_KEY, model: config?.model ?? process.env.NEXT_PUBLIC_OPENAI_COMPAT_MODEL, responseFormatType: config?.responseFormatType });
   return new MockChatProvider();
 }
