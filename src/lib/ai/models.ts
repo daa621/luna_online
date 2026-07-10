@@ -25,8 +25,8 @@ export function parseOpenAiCompatibleModels(payload: unknown): AiModelListResult
   return { models, rawResponse: payload };
 }
 
-export async function fetchOpenAiCompatibleModels(baseUrl: string, fetchImpl: typeof fetch = fetch): Promise<AiModelListResult> {
-  const modelsUrl = `${baseUrl.replace(/\/$/, '')}/models`;
+export async function fetchOpenAiCompatibleModels(baseUrl = '/api/ai/models', fetchImpl: typeof fetch = fetch, direct = false): Promise<AiModelListResult> {
+  const modelsUrl = direct ? `${baseUrl.replace(/\/$/, '')}/models` : baseUrl;
   try {
     const response = await fetchImpl(modelsUrl);
     if (!response.ok) return { models: [], error: `Modellliste konnte nicht geladen werden (${response.status}) von ${modelsUrl}.` };

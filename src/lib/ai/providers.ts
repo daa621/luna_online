@@ -37,8 +37,14 @@ export class OpenAiCompatibleChatProvider implements ChatProvider {
   private model() {
     return this.config.model?.trim() || 'local-model';
   }
+  private chatUrl() {
+    const baseUrl = this.config.baseUrl?.trim();
+    if (!baseUrl || baseUrl.includes('localhost:1234') || baseUrl.includes('127.0.0.1:1234')) return '/api/ai/chat';
+    if (baseUrl.startsWith('/')) return baseUrl;
+    return `${baseUrl.replace(/\/$/, '')}/chat/completions`;
+  }
   async continueStory(request: StoryTurnRequest): Promise<StructuredAiResponse> {
-    const response = await fetch(`${this.config.baseUrl ?? 'https://api.openai.com/v1'}/chat/completions`, {
+    const response = await fetch(this.chatUrl(), {
       method: 'POST', headers: this.headers(),
       body: JSON.stringify({ model: this.model(), response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Du bist eine RPG-Spielleitung. Liefere valides JSON mit storyText und events. Bestimme keine Würfelergebnisse selbst.' }, { role: 'user', content: buildStoryPrompt(request.game, request.playerText) }] }),
     });
@@ -51,7 +57,7 @@ export class OpenAiCompatibleChatProvider implements ChatProvider {
     }
   }
   async finalizeStory(request: FinalizeStoryRequest): Promise<StructuredAiResponse> {
-    const response = await fetch(`${this.config.baseUrl ?? 'https://api.openai.com/v1'}/chat/completions`, {
+    const response = await fetch(this.chatUrl(), {
       method: 'POST', headers: this.headers(),
       body: JSON.stringify({ model: this.model(), response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Formuliere den endgültigen Storytext nach den bereits ausgewerteten Würfeln und Regelereignissen. Liefere JSON mit storyText.' }, { role: 'user', content: `Spielerhandlung: ${request.playerText}\nEntwurf: ${request.draft.storyText}\nSkill Checks: ${JSON.stringify(request.skillChecks)}\nAuswirkungen: ${JSON.stringify(request.effects)}\nUngültige Events: ${JSON.stringify(request.invalidEvents)}` }] }),
     });

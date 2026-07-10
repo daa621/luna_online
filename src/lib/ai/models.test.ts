@@ -25,15 +25,17 @@ describe('fetchOpenAiCompatibleModels', () => {
 
   it('uses the exact /v1/models endpoint for LM Studio', async () => {
     const fetchImpl = vi.fn<typeof fetch>(async () => new Response(JSON.stringify(lmStudioPayload)));
-    await fetchOpenAiCompatibleModels('http://localhost:1234/v1', fetchImpl);
-    expect(fetchImpl).toHaveBeenCalledWith('http://localhost:1234/v1/models');
+    await fetchOpenAiCompatibleModels(undefined, fetchImpl);
+    expect(fetchImpl).toHaveBeenCalledWith('/api/ai/models');
+    await fetchOpenAiCompatibleModels('http://localhost:1234/v1', fetchImpl, true);
+    expect(fetchImpl).toHaveBeenLastCalledWith('http://localhost:1234/v1/models');
   });
 
   it('returns a readable error when LM Studio is unreachable', async () => {
     const fetchImpl = async () => { throw new Error('connection refused'); };
-    const result = await fetchOpenAiCompatibleModels('http://localhost:1234/v1', fetchImpl as typeof fetch);
+    const result = await fetchOpenAiCompatibleModels(undefined, fetchImpl as typeof fetch);
     expect(result.models).toEqual([]);
-    expect(result.error).toContain('http://localhost:1234/v1/models');
+    expect(result.error).toContain('/api/ai/models');
   });
 
   it('reports unexpected response structures with the raw payload', () => {

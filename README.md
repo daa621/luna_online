@@ -63,10 +63,10 @@ Für LM Studio oder andere lokale OpenAI-kompatible Server wird `NEXT_PUBLIC_OPE
 
 1. In LM Studio ein Chat-Modell laden.
 2. Den lokalen Server in LM Studio aktivieren. Die App erwartet standardmäßig `http://localhost:1234/v1`.
-3. In der Oberfläche im Spielmenü den Provider **LM Studio** auswählen. Die App lädt Modelle exakt aus `http://localhost:1234/v1/models`, liest die IDs aus `response.data` und blendet Embedding-Modelle aus dem Dropdown aus.
+3. In der Oberfläche im Spielmenü den Provider **LM Studio** auswählen. Der Browser ruft standardmäßig den Next.js-Proxy `/api/ai/models` auf; dieser lädt serverseitig `http://localhost:1234/v1/models`, liest die IDs aus `response.data` und blendet Embedding-Modelle aus dem Dropdown aus.
 4. Falls die Modellliste nicht erreichbar ist oder CORS/Serverstart noch nicht passt, kann die Modell-ID manuell eingetragen werden. Der aktuelle Provider und das Modell werden lokal im Browser gespeichert und beim nächsten Zug verwendet.
 
-Für lokale LM-Studio-Tests ist kein echter API-Key erforderlich; der OpenAI-kompatible Provider sendet dann nur `Content-Type: application/json`. Falls der Browser die Modellliste oder Chat-Completion nicht laden kann, prüfe, ob der LM-Studio-Server läuft und CORS-Anfragen vom Next.js-Origin akzeptiert.
+Für lokale LM-Studio-Tests ist kein echter API-Key erforderlich; der OpenAI-kompatible Provider sendet dann nur `Content-Type: application/json`. Chat-Anfragen laufen ebenfalls über den Next.js-Proxy `/api/ai/chat`, der serverseitig an `http://localhost:1234/v1/chat/completions` weiterleitet. Dadurch ist kein direkter Browser-CORS-Zugriff auf LM Studio nötig; der lokale Server muss aber für Next.js erreichbar sein.
 
 ## Bildsystem
 
