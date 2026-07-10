@@ -58,6 +58,16 @@ Für LM Studio oder andere lokale OpenAI-kompatible Server wird `NEXT_PUBLIC_OPE
 
 > Hinweis: Da die App bewusst ohne Backend läuft, sind `NEXT_PUBLIC_*` Variablen im Browser sichtbar. `NEXT_PUBLIC_OPENAI_COMPAT_API_KEY` ist deshalb ausschließlich für lokale Tests akzeptabel. Für echte Nutzung muss ein serverseitiger Proxy ergänzt werden, damit API-Schlüssel nicht an Browser ausgeliefert werden.
 
+
+## LM Studio lokal verwenden
+
+1. In LM Studio ein Chat-Modell laden.
+2. Den lokalen Server in LM Studio aktivieren. Die App erwartet standardmäßig `http://localhost:1234/v1`.
+3. In der Oberfläche im Spielmenü den Provider **LM Studio** auswählen. Die App lädt Modelle aus `http://localhost:1234/v1/models` und zeigt die Modell-IDs im Dropdown an.
+4. Falls die Modellliste nicht erreichbar ist oder CORS/Serverstart noch nicht passt, kann die Modell-ID manuell eingetragen werden. Der aktuelle Provider und das Modell werden lokal im Browser gespeichert und beim nächsten Zug verwendet.
+
+Für lokale LM-Studio-Tests ist kein echter API-Key erforderlich; der OpenAI-kompatible Provider sendet dann nur `Content-Type: application/json`. Falls der Browser die Modellliste oder Chat-Completion nicht laden kann, prüfe, ob der LM-Studio-Server läuft und CORS-Anfragen vom Next.js-Origin akzeptiert.
+
 ## Bildsystem
 
 `ImageProvider` kapselt Bildgenerierung. Der aktuelle Mock-Provider erzeugt Platzhalterbilder. Die Schnittstelle enthält bereits `GameState`, `ImageRequest` und beteiligte Charakter-IDs, sodass Referenzbilder später an OpenAI Images, ComfyUI, Stable Diffusion, Flux oder andere Anbieter weitergegeben werden können.

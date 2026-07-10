@@ -31,31 +31,42 @@ export class MockChatProvider implements ChatProvider {
 export class OpenAiCompatibleChatProvider implements ChatProvider {
   id = 'openai-compatible'; label = 'OpenAI-kompatibel';
   constructor(private readonly config: ChatProviderConfig) {}
+  private headers(): Record<string, string> {
+    return this.config.apiKey ? { 'Content-Type': 'application/json', Authorization: `Bearer ${this.config.apiKey}` } : { 'Content-Type': 'application/json' };
+  }
+  private model() {
+    return this.config.model?.trim() || 'local-model';
+  }
   async continueStory(request: StoryTurnRequest): Promise<StructuredAiResponse> {
-    // Browser-exposed NEXT_PUBLIC keys are acceptable only for local experiments. Production use needs a server-side proxy.
-    if (!this.config.apiKey) throw new Error('Kein API-Schlüssel konfiguriert. Setze NEXT_PUBLIC_OPENAI_COMPAT_API_KEY nur für lokale Tests oder nutze den Mock-Provider.');
     const response = await fetch(`${this.config.baseUrl ?? 'https://api.openai.com/v1'}/chat/completions`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.config.apiKey}` },
-      body: JSON.stringify({ model: this.config.model ?? 'gpt-4.1-mini', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Du bist eine RPG-Spielleitung. Liefere valides JSON mit storyText und events. Bestimme keine Würfelergebnisse selbst.' }, { role: 'user', content: buildStoryPrompt(request.game, request.playerText) }] }),
+      method: 'POST', headers: this.headers(),
+      body: JSON.stringify({ model: this.model(), response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Du bist eine RPG-Spielleitung. Liefere valides JSON mit storyText und events. Bestimme keine Würfelergebnisse selbst.' }, { role: 'user', content: buildStoryPrompt(request.game, request.playerText) }] }),
     });
     if (!response.ok) throw new Error(`KI-Anfrage fehlgeschlagen (${response.status}): ${await response.text()}`);
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    return responseSchema.parse(JSON.parse(data.choices?.[0]?.message?.content ?? '{}')) as StructuredAiResponse;
+    try {
+      return responseSchema.parse(JSON.parse(data.choices?.[0]?.message?.content ?? '{}')) as StructuredAiResponse;
+    } catch (err) {
+      throw new Error(`KI-Antwort ist kein gültiges JSON im erwarteten Format: ${err instanceof Error ? err.message : 'Unbekannter Parserfehler'}`);
+    }
   }
   async finalizeStory(request: FinalizeStoryRequest): Promise<StructuredAiResponse> {
-    if (!this.config.apiKey) throw new Error('Kein API-Schlüssel konfiguriert. Setze NEXT_PUBLIC_OPENAI_COMPAT_API_KEY nur für lokale Tests oder nutze den Mock-Provider.');
     const response = await fetch(`${this.config.baseUrl ?? 'https://api.openai.com/v1'}/chat/completions`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.config.apiKey}` },
-      body: JSON.stringify({ model: this.config.model ?? 'gpt-4.1-mini', response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Formuliere den endgültigen Storytext nach den bereits ausgewerteten Würfeln und Regelereignissen. Liefere JSON mit storyText.' }, { role: 'user', content: `Spielerhandlung: ${request.playerText}\nEntwurf: ${request.draft.storyText}\nSkill Checks: ${JSON.stringify(request.skillChecks)}\nAuswirkungen: ${JSON.stringify(request.effects)}\nUngültige Events: ${JSON.stringify(request.invalidEvents)}` }] }),
+      method: 'POST', headers: this.headers(),
+      body: JSON.stringify({ model: this.model(), response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Formuliere den endgültigen Storytext nach den bereits ausgewerteten Würfeln und Regelereignissen. Liefere JSON mit storyText.' }, { role: 'user', content: `Spielerhandlung: ${request.playerText}\nEntwurf: ${request.draft.storyText}\nSkill Checks: ${JSON.stringify(request.skillChecks)}\nAuswirkungen: ${JSON.stringify(request.effects)}\nUngültige Events: ${JSON.stringify(request.invalidEvents)}` }] }),
     });
     if (!response.ok) throw new Error(`KI-Finalisierung fehlgeschlagen (${response.status}): ${await response.text()}`);
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    return responseSchema.pick({ storyText: true }).parse(JSON.parse(data.choices?.[0]?.message?.content ?? '{}')) as StructuredAiResponse;
+    try {
+      return responseSchema.pick({ storyText: true }).parse(JSON.parse(data.choices?.[0]?.message?.content ?? '{}')) as StructuredAiResponse;
+    } catch (err) {
+      throw new Error(`Finale KI-Antwort ist kein gültiges JSON im erwarteten Format: ${err instanceof Error ? err.message : 'Unbekannter Parserfehler'}`);
+    }
   }
 }
 
-export function createChatProvider(): ChatProvider {
-  const provider = process.env.NEXT_PUBLIC_AI_PROVIDER ?? 'mock';
-  if (provider === 'openai-compatible') return new OpenAiCompatibleChatProvider({ provider, baseUrl: process.env.NEXT_PUBLIC_OPENAI_COMPAT_BASE_URL, apiKey: process.env.NEXT_PUBLIC_OPENAI_COMPAT_API_KEY, model: process.env.NEXT_PUBLIC_OPENAI_COMPAT_MODEL });
+export function createChatProvider(config?: ChatProviderConfig): ChatProvider {
+  const provider = config?.provider ?? process.env.NEXT_PUBLIC_AI_PROVIDER ?? 'mock';
+  if (provider === 'openai-compatible') return new OpenAiCompatibleChatProvider({ provider, baseUrl: config?.baseUrl ?? process.env.NEXT_PUBLIC_OPENAI_COMPAT_BASE_URL, apiKey: config?.apiKey ?? process.env.NEXT_PUBLIC_OPENAI_COMPAT_API_KEY, model: config?.model ?? process.env.NEXT_PUBLIC_OPENAI_COMPAT_MODEL });
   return new MockChatProvider();
 }
