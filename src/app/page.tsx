@@ -12,6 +12,10 @@ import { playTurn } from '@/lib/game/engine';
 import type { GameSetup, GameState } from '@/lib/game/types';
 import { LocalJsonSaveGameStore } from '@/lib/storage/save-game-store';
 
+function normalizeGame(game: GameState): GameState {
+  return { ...game, quests: game.quests ?? [], relationships: game.relationships ?? Object.fromEntries(game.setup.companions.map((companion) => [companion.id, 0])), status: { health: 100, location: 'Unbekannt', ...game.status } };
+}
+
 export default function Home() {
   const [game, setGame] = useState<GameState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -20,7 +24,7 @@ export default function Home() {
   const chat = useMemo(() => createChatProvider(), []);
   const images = useMemo(() => createImageProvider(), []);
 
-  useEffect(() => { store.list().then(async ([latest]) => { if (latest) setGame(await store.load(latest.id)); }); }, [store]);
+  useEffect(() => { store.list().then(async ([latest]) => { if (latest) { const loaded = await store.load(latest.id); if (loaded) setGame(normalizeGame(loaded)); } }); }, [store]);
   const start = (setup: GameSetup) => setGame(createInitialGame(setup));
   const save = async () => { if (game) await store.save({ ...game, updatedAt: new Date().toISOString() }); };
   const submit = async (text: string) => { if (!game) return; setBusy(true); setError(null); try { const next = await playTurn(game, text, chat, images); setGame(next); await store.save(next); } catch (err) { setError(err instanceof Error ? err.message : 'Unbekannter Fehler'); } finally { setBusy(false); } };

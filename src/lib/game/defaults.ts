@@ -21,7 +21,9 @@ export function createInitialGame(setup: GameSetup): GameState {
     setup,
     story: [{ id: createId('system'), kind: 'system', createdAt: timestamp, text: 'Das Abenteuer beginnt. Beschreibe deine erste Handlung.' }],
     inventory: [],
-    status: { location: 'Unbekannt', timeOfDay: 'Unbestimmt', health: 100, quests: [], gold: 0, experience: 0 },
+    status: { location: 'Unbekannt', timeOfDay: 'Unbestimmt', health: 100, gold: 0, experience: 0 },
+    quests: [],
+    relationships: Object.fromEntries(setup.companions.map((companion) => [companion.id, 0])),
     schemaVersion: 1,
   };
 }

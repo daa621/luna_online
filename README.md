@@ -30,6 +30,13 @@ Zentrale Typen liegen in `src/lib/game/types.ts`:
 - `InventoryItem`: Name, Beschreibung, Menge, Kategorie und freie Attribute
 - `GameStatus`: frei erweiterbare Key-Value-Struktur für Ort, Quests, Beziehungen, Gold, Erfahrung und eigene Variablen
 
+
+## Ereignis- und Questmodell
+
+Die KI darf den Spielzustand nicht mehr direkt setzen. Sie liefert `storyText` und validierbare `events`. Die Engine prüft diese Ereignisse mit Zod-Schemas und wendet nur gültige Änderungen an. Unterstützte Ereignisse sind unter anderem `item_added`, `item_removed`, `health_changed`, `relationship_changed`, `quest_started`, `quest_progressed`, `quest_completed`, `quest_failed`, `location_changed` und `skill_check`.
+
+Quests besitzen ein eigenes Modell mit `id`, `title`, `description`, `status`, `objectives` inklusive Fortschritt und optionalen `rewards`. Skill Checks werden nur von der KI vorgeschlagen; die Engine würfelt reproduzierbar einen W20, addiert den Modifier und protokolliert Erfolg oder Misserfolg im Storyeintrag.
+
 ## KI-API
 
 `ChatProvider` definiert eine einheitliche Methode `continueStory`. Implementiert sind:
@@ -49,7 +56,7 @@ NEXT_PUBLIC_OPENAI_COMPAT_API_KEY=
 
 Für LM Studio oder andere lokale OpenAI-kompatible Server wird `NEXT_PUBLIC_OPENAI_COMPAT_BASE_URL` entsprechend gesetzt und `NEXT_PUBLIC_AI_PROVIDER=openai-compatible` aktiviert.
 
-> Hinweis: Da die App bewusst ohne Backend läuft, sind `NEXT_PUBLIC_*` Variablen im Browser sichtbar. Für produktive API-Schlüssel sollte später ein Backend-Proxy ergänzt werden.
+> Hinweis: Da die App bewusst ohne Backend läuft, sind `NEXT_PUBLIC_*` Variablen im Browser sichtbar. `NEXT_PUBLIC_OPENAI_COMPAT_API_KEY` ist deshalb ausschließlich für lokale Tests akzeptabel. Für echte Nutzung muss ein serverseitiger Proxy ergänzt werden, damit API-Schlüssel nicht an Browser ausgeliefert werden.
 
 ## Bildsystem
 
