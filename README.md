@@ -59,6 +59,13 @@ Für LM Studio oder andere lokale OpenAI-kompatible Server wird `NEXT_PUBLIC_OPE
 > Hinweis: Da die App bewusst ohne Backend läuft, sind `NEXT_PUBLIC_*` Variablen im Browser sichtbar. `NEXT_PUBLIC_OPENAI_COMPAT_API_KEY` ist deshalb ausschließlich für lokale Tests akzeptabel. Für echte Nutzung muss ein serverseitiger Proxy ergänzt werden, damit API-Schlüssel nicht an Browser ausgeliefert werden.
 
 
+
+## Getrennte Story- und Regel-LLM-Aufrufe
+
+Ein Spielzug ist in zwei Rollen getrennt: Zuerst erzeugt das Story-LLM ausschließlich freie Prosa/Markdown ohne JSON, Events oder technische Regelbegriffe. Danach erhält das Regel-LLM Spielerhandlung, Storytext und aktuellen Spielzustand und antwortet ausschließlich mit kleinem JSON der Form `{ "events": [...] }`. Die Engine validiert diese Events, würfelt Skill Checks selbst und wendet nur gültige Änderungen an.
+
+Aktuell kann dasselbe LM-Studio-Modell beide Rollen übernehmen. Die Provider-Abstraktion trennt die Methoden (`continueNarrative` und `analyzeRules`) bereits so, dass später unterschiedliche Modelle für Story, Regeln und Bilder eingesetzt werden können. Diese Umsetzung liegt auf dem Branch `codex/separate-story-and-rules-llm`; `main` bleibt unverändert, bis der Branch bewusst gemergt wird.
+
 ## LM Studio lokal verwenden
 
 1. In LM Studio ein Chat-Modell laden.

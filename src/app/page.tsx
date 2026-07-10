@@ -62,7 +62,7 @@ export default function Home() {
   }, [store]);
   const start = (setup: GameSetup) => setGame(createInitialGame(setup));
   const save = async () => { if (game) await store.save({ ...game, updatedAt: new Date().toISOString() }); };
-  const submit = async (text: string) => { if (!game) return; setBusy(true); setError(null); try { const next = await playTurn(game, text, createChatProvider(aiSettings), images); setGame(next); await store.save(next); } catch (err) { setError(err instanceof Error ? err.message : 'Unbekannter Fehler'); } finally { setBusy(false); } };
+  const submit = async (text: string) => { if (!game) return; setBusy(true); setError(null); try { const next = await playTurn(game, text, createChatProvider(aiSettings), images); setGame(next); const lastEntry = next.story.at(-1); const ruleAnalysisFailed = lastEntry?.kind === 'ai' && lastEntry.invalidEvents?.some((event) => event.startsWith('Regelanalyse fehlgeschlagen')); if (!ruleAnalysisFailed) await store.save(next); } catch (err) { setError(err instanceof Error ? err.message : 'Unbekannter Fehler'); } finally { setBusy(false); } };
   const remove = async () => { if (game) await store.delete(game.id); setGame(null); };
 
   if (!game) return <main className="app-shell"><SetupWizard onComplete={start} /></main>;

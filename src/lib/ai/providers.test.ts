@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createChatProvider } from './providers';
+import { createChatProvider, MockChatProvider } from './providers';
 import type { GameState } from '@/lib/game/types';
 
 const game: GameState = { id: 'g', name: 'g', createdAt: '', updatedAt: '', setup: { protagonist: { id: 'hero', name: 'Hero', description: '', gender: 'unspecified', traits: [], referenceImages: [] }, companions: [], world: { setting: '', backstory: '', rules: '', mood: '', referenceImages: [] } }, story: [], inventory: [], status: {}, quests: [], relationships: {}, schemaVersion: 1 };
@@ -11,10 +11,16 @@ function stubChatContent(content: string) {
 }
 
 describe('createChatProvider', () => {
-  it('uses the selected LM Studio model and text response format without requiring an API key', async () => {
-    const fetchMock = stubChatContent(JSON.stringify({ storyText: 'Draft', events: [] }));
+  it('MockProvider supports narrative and rule analysis separately', async () => {
+    const provider = new MockChatProvider();
+    await expect(provider.continueNarrative({ playerText: 'Suche den Markt', game })).resolves.toContain('Suche den Markt');
+    await expect(provider.analyzeRules({ playerText: 'Suche den Markt', storyText: 'Story', game })).resolves.toMatchObject({ events: expect.any(Array) });
+  });
+
+  it('uses the selected LM Studio model and text response format for narrative calls', async () => {
+    const fetchMock = stubChatContent('Nur Erzähltext.');
     const provider = createChatProvider({ provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: 'lm-test', apiKey: '' });
-    await provider.continueStory({ playerText: 'Test', game });
+    await provider.continueNarrative({ playerText: 'Test', game });
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const body = JSON.parse(String(init.body)) as { model: string; response_format: { type: string } };
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/ai/chat');
@@ -24,10 +30,10 @@ describe('createChatProvider', () => {
     vi.unstubAllGlobals();
   });
 
-  it('uses text response format for LM Studio final story requests', async () => {
-    const fetchMock = stubChatContent(JSON.stringify({ storyText: 'Final' }));
+  it('uses text response format for LM Studio rule analysis calls', async () => {
+    const fetchMock = stubChatContent(JSON.stringify({ events: [] }));
     const provider = createChatProvider({ provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: 'lm-test', apiKey: '' });
-    await provider.finalizeStory({ game, playerText: 'Test', draft: { storyText: 'Draft', events: [] }, skillChecks: [], effects: [], invalidEvents: [] });
+    await provider.analyzeRules({ game, playerText: 'Test', storyText: 'Story' });
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const body = JSON.parse(String(init.body)) as { response_format: { type: string } };
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/ai/chat');
@@ -35,10 +41,10 @@ describe('createChatProvider', () => {
     vi.unstubAllGlobals();
   });
 
-  it('can still request json_object for non-LM-Studio OpenAI-compatible providers', async () => {
-    const fetchMock = stubChatContent(JSON.stringify({ storyText: 'Draft', events: [] }));
+  it('can still request json_object for non-LM-Studio rule-analysis providers', async () => {
+    const fetchMock = stubChatContent(JSON.stringify({ events: [] }));
     const provider = createChatProvider({ provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'gpt-test', apiKey: 'test-key' });
-    await provider.continueStory({ playerText: 'Test', game });
+    await provider.analyzeRules({ playerText: 'Test', storyText: 'Story', game });
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const body = JSON.parse(String(init.body)) as { response_format: { type: string } };
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.openai.com/v1/chat/completions');
@@ -47,21 +53,21 @@ describe('createChatProvider', () => {
   });
 
   it.each([
-    ['pure JSON', '{"storyText":"Draft","events":[]}'],
-    ['json fence', '```json\n{"storyText":"Draft","events":[]}\n```'],
-    ['plain fence', '```\n{"storyText":"Draft","events":[]}\n```'],
-    ['surrounding text', 'Here is the result:\n{"storyText":"Draft","events":[]}\nThanks.'],
-  ])('parses %s responses from LM Studio', async (_label, content) => {
+    ['pure JSON', '{"events":[]}'],
+    ['json fence', '```json\n{"events":[]}\n```'],
+    ['plain fence', '```\n{"events":[]}\n```'],
+    ['surrounding text', 'Here is the result:\n{"events":[]}\nThanks.'],
+  ])('parses rule-analysis %s responses from LM Studio', async (_label, content) => {
     stubChatContent(content);
     const provider = createChatProvider({ provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: 'lm-test', apiKey: '' });
-    await expect(provider.continueStory({ playerText: 'Test', game })).resolves.toMatchObject({ storyText: 'Draft', events: [] });
+    await expect(provider.analyzeRules({ playerText: 'Test', storyText: 'Story', game })).resolves.toMatchObject({ events: [] });
     vi.unstubAllGlobals();
   });
 
-  it('reports the cleaned response preview for invalid JSON', async () => {
-    stubChatContent('```json\n{"storyText":\n```');
+  it('reports the cleaned response preview for invalid rule JSON', async () => {
+    stubChatContent('```json\n{"events":\n```');
     const provider = createChatProvider({ provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: 'lm-test', apiKey: '' });
-    await expect(provider.continueStory({ playerText: 'Test', game })).rejects.toThrow(/Bereinigter Inhalt/);
+    await expect(provider.analyzeRules({ playerText: 'Test', storyText: 'Story', game })).rejects.toThrow(/Bereinigter Inhalt/);
     vi.unstubAllGlobals();
   });
 });

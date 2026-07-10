@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { buildStoryPrompt } from './prompt';
-import type { ChatProvider, ChatProviderConfig, ChatResponseFormatType, FinalizeStoryRequest, StoryTurnRequest } from './types';
+import { buildNarrativePrompt, buildRuleAnalysisPrompt } from './prompt';
+import type { ChatProvider, ChatProviderConfig, ChatResponseFormatType, FinalizeStoryRequest, NarrativeRequest, RuleAnalysisRequest, StoryTurnRequest } from './types';
 import type { StructuredAiResponse } from '@/lib/game/types';
 
 const jsonValueSchema: z.ZodType<unknown> = z.lazy(() => z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]));
@@ -39,13 +39,25 @@ const responseSchema = z.object({
 
 export class MockChatProvider implements ChatProvider {
   id = 'mock'; label = 'Mock Storyteller';
-  async continueStory({ playerText, game }: StoryTurnRequest): Promise<StructuredAiResponse> {
+  async continueNarrative({ playerText, game }: NarrativeRequest): Promise<string> {
+    return `**${game.setup.protagonist.name || 'Du'}** handelst entschlossen: „${playerText}“.
+
+Die Welt reagiert spürbar. Ein neuer erzählerischer Faden öffnet sich, während die Spielleitung im Mock-Modus läuft.`;
+  }
+  async analyzeRules({ playerText }: RuleAnalysisRequest): Promise<StructuredAiResponse> {
     const wantsCheck = /kletter|schleich|überred|kämpf|suche/i.test(playerText);
-    return { storyText: `Entwurf: ${game.setup.protagonist.name || 'Du'} versucht: „${playerText}“.`, events: [{ type: 'status_changed', key: 'mood', value: 'angespannt', reason: 'Mock-Fortschritt' }, ...(wantsCheck ? [{ type: 'skill_check', id: 'main_check', skill: 'Abenteuer', difficulty: 12, modifier: 2, reason: playerText }, { type: 'item_added', name: 'Erkenntnis', description: 'Eine aus dem gelungenen Versuch gewonnene Einsicht.', quantity: 1, category: 'Hinweis', requiresSkillCheck: { skillCheckId: 'main_check', outcome: 'success' } }] : [])], imageRequest: { shouldGenerate: playerText.toLowerCase().includes('bild'), prompt: `Dramatische RPG-Szene: ${playerText}`, involvedCharacterIds: [game.setup.protagonist.id], location: String(game.status.location ?? ''), timeOfDay: String(game.status.timeOfDay ?? ''), sceneSummary: playerText } };
+    return { storyText: '', events: [{ type: 'status_changed', key: 'mood', value: 'angespannt', reason: 'Mock-Fortschritt' }, ...(wantsCheck ? [{ type: 'skill_check', id: 'main_check', skill: 'Abenteuer', difficulty: 12, modifier: 2, reason: playerText }] : [])] };
+  }
+  async continueStory(request: StoryTurnRequest): Promise<StructuredAiResponse> {
+    return { storyText: await this.continueNarrative(request), events: (await this.analyzeRules({ ...request, storyText: '' })).events };
   }
   async finalizeStory({ playerText, game, skillChecks }: FinalizeStoryRequest): Promise<StructuredAiResponse> {
-    const checkSummary = skillChecks.length ? `\n\nWürfelergebnis: ${skillChecks.map((check) => `${check.skill} ${check.success ? 'gelingt' : 'misslingt'} (${check.total}/${check.difficulty})`).join(', ')}.` : '';
-    return { storyText: `**${game.setup.protagonist.name || 'Du'}** handelst entschlossen: „${playerText}“.\n\nDie Welt reagiert auf das regelkonform ausgewertete Ergebnis.${checkSummary}` };
+    const checkSummary = skillChecks.length ? `
+
+Würfelergebnis: ${skillChecks.map((check) => `${check.skill} ${check.success ? 'gelingt' : 'misslingt'} (${check.total}/${check.difficulty})`).join(', ')}.` : '';
+    return { storyText: `**${game.setup.protagonist.name || 'Du'}** handelst entschlossen: „${playerText}“.
+
+Die Welt reagiert auf das regelkonform ausgewertete Ergebnis.${checkSummary}` };
   }
 }
 
@@ -70,23 +82,28 @@ export class OpenAiCompatibleChatProvider implements ChatProvider {
     if (!baseUrl || baseUrl.includes('localhost:1234') || baseUrl.includes('127.0.0.1:1234')) return 'text';
     return 'json_object';
   }
-  async continueStory(request: StoryTurnRequest): Promise<StructuredAiResponse> {
+  private async chatCompletion(messages: Array<{ role: 'system' | 'user'; content: string }>, responseFormatType: ChatResponseFormatType) {
     const response = await fetch(this.chatUrl(), {
       method: 'POST', headers: this.headers(),
-      body: JSON.stringify({ model: this.model(), response_format: { type: this.responseFormatType() }, messages: [{ role: 'system', content: 'Du bist eine RPG-Spielleitung. Liefere valides JSON mit storyText und events. Bestimme keine Würfelergebnisse selbst.' }, { role: 'user', content: buildStoryPrompt(request.game, request.playerText) }] }),
+      body: JSON.stringify({ model: this.model(), response_format: { type: responseFormatType }, messages }),
     });
     if (!response.ok) throw new Error(`KI-Anfrage fehlgeschlagen (${response.status}): ${await response.text()}`);
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    return parseAiJsonContent(data.choices?.[0]?.message?.content ?? '{}', (value) => responseSchema.parse(value) as StructuredAiResponse, 'KI-Antwort');
+    return data.choices?.[0]?.message?.content ?? '';
+  }
+  async continueNarrative(request: NarrativeRequest): Promise<string> {
+    return this.chatCompletion([{ role: 'system', content: 'Du bist ein Erzähler. Schreibe nur Prosa oder Markdown, niemals JSON und keine Regelbegriffe.' }, { role: 'user', content: buildNarrativePrompt(request.game, request.playerText) }], 'text');
+  }
+  async analyzeRules(request: RuleAnalysisRequest): Promise<StructuredAiResponse> {
+    const content = await this.chatCompletion([{ role: 'system', content: 'Du bist ein Regelanalyst. Antworte ausschließlich als JSON {"events":[...]} ohne Markdown.' }, { role: 'user', content: buildRuleAnalysisPrompt(request.game, request.playerText, request.storyText) }], this.responseFormatType());
+    return parseAiJsonContent(content, (value) => responseSchema.pick({ events: true }).parse(value) as StructuredAiResponse, 'Regel-KI-Antwort');
+  }
+  async continueStory(request: StoryTurnRequest): Promise<StructuredAiResponse> {
+    const storyText = await this.continueNarrative(request);
+    return { ...(await this.analyzeRules({ ...request, storyText })), storyText };
   }
   async finalizeStory(request: FinalizeStoryRequest): Promise<StructuredAiResponse> {
-    const response = await fetch(this.chatUrl(), {
-      method: 'POST', headers: this.headers(),
-      body: JSON.stringify({ model: this.model(), response_format: { type: this.responseFormatType() }, messages: [{ role: 'system', content: 'Formuliere den endgültigen Storytext nach den bereits ausgewerteten Würfeln und Regelereignissen. Liefere JSON mit storyText.' }, { role: 'user', content: `Spielerhandlung: ${request.playerText}\nEntwurf: ${request.draft.storyText}\nSkill Checks: ${JSON.stringify(request.skillChecks)}\nAuswirkungen: ${JSON.stringify(request.effects)}\nUngültige Events: ${JSON.stringify(request.invalidEvents)}` }] }),
-    });
-    if (!response.ok) throw new Error(`KI-Finalisierung fehlgeschlagen (${response.status}): ${await response.text()}`);
-    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    return parseAiJsonContent(data.choices?.[0]?.message?.content ?? '{}', (value) => responseSchema.pick({ storyText: true }).parse(value) as StructuredAiResponse, 'Finale KI-Antwort');
+    return { storyText: request.draft.storyText };
   }
 }
 
