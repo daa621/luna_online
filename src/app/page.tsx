@@ -24,7 +24,26 @@ export default function Home() {
   const chat = useMemo(() => createChatProvider(), []);
   const images = useMemo(() => createImageProvider(), []);
 
-  useEffect(() => { store.list().then(async ([latest]) => { if (latest) { const loaded = await store.load(latest.id); if (loaded) setGame(normalizeGame(loaded)); } }); }, [store]);
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadLatestSave() {
+      try {
+        const [latest] = await store.list();
+        if (!latest) return;
+        const loaded = await store.load(latest.id);
+        if (loaded && isMounted) setGame(normalizeGame(loaded));
+      } catch (err) {
+        if (isMounted) setError(err instanceof Error ? `Spielstand konnte nicht geladen werden: ${err.message}` : 'Spielstand konnte nicht geladen werden.');
+      }
+    }
+
+    void loadLatestSave();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [store]);
   const start = (setup: GameSetup) => setGame(createInitialGame(setup));
   const save = async () => { if (game) await store.save({ ...game, updatedAt: new Date().toISOString() }); };
   const submit = async (text: string) => { if (!game) return; setBusy(true); setError(null); try { const next = await playTurn(game, text, chat, images); setGame(next); await store.save(next); } catch (err) { setError(err instanceof Error ? err.message : 'Unbekannter Fehler'); } finally { setBusy(false); } };
