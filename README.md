@@ -33,9 +33,9 @@ Zentrale Typen liegen in `src/lib/game/types.ts`:
 
 ## Ereignis- und Questmodell
 
-Die KI darf den Spielzustand nicht mehr direkt setzen. Sie liefert `storyText` und validierbare `events`. Die Engine prüft diese Ereignisse mit Zod-Schemas und wendet nur gültige Änderungen an. Unterstützte Ereignisse sind unter anderem `item_added`, `item_removed`, `health_changed`, `relationship_changed`, `quest_started`, `quest_progressed`, `quest_completed`, `quest_failed`, `location_changed` und `skill_check`.
+Die KI darf den Spielzustand nicht direkt setzen. Sie liefert zunächst einen Entwurf mit validierbaren `events`; jedes Event wird einzeln geprüft, sodass gemischte Antworten teilweise angewendet werden können. Unterstützte Ereignisse sind unter anderem `item_added`, `item_removed`, `health_changed`, `relationship_changed`, `quest_started`, `quest_progressed`, `quest_completed`, `quest_failed`, `location_changed` und `skill_check`. Events können über `requiresSkillCheck` an einen bestimmten Würfelausgang gebunden werden, damit Belohnungen oder Questfortschritt nicht trotz fehlgeschlagener Probe ausgeführt werden.
 
-Quests besitzen ein eigenes Modell mit `id`, `title`, `description`, `status`, `objectives` inklusive Fortschritt und optionalen `rewards`. Skill Checks werden nur von der KI vorgeschlagen; die Engine würfelt reproduzierbar einen W20, addiert den Modifier und protokolliert Erfolg oder Misserfolg im Storyeintrag.
+Quests besitzen ein eigenes Modell mit `id`, `title`, `description`, `status`, `objectives` inklusive Fortschritt und optionalen `rewards`. Eine Quest kann nur abgeschlossen werden, wenn alle Objectives erfüllt sind; Belohnungen werden nicht implizit vergeben, sondern müssen als normale validierte Events wie `item_added` vorgeschlagen werden. Skill Checks werden nur von der KI vorgeschlagen; die Engine würfelt reproduzierbar einen W20, addiert den Modifier und übergibt das Ergebnis anschließend an die KI, die daraus den endgültigen Storytext formuliert.
 
 ## KI-API
 

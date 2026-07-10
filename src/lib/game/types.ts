@@ -73,7 +73,7 @@ export interface StructuredAiResponse {
 export type QuestStatus = 'active' | 'completed' | 'failed';
 export interface QuestObjective { id: string; title: string; target: number; progress: number; completed: boolean; }
 export interface Quest { id: string; title: string; description: string; status: QuestStatus; objectives: QuestObjective[]; rewards?: string[]; }
-export interface SkillCheckResult { skill: string; difficulty: number; modifier: number; roll: number; total: number; success: boolean; reason?: string; }
+export interface SkillCheckResult { id: string; skill: string; difficulty: number; modifier: number; roll: number; total: number; success: boolean; reason?: string; }
 export interface StoryTurnEffect { type: 'inventory' | 'status' | 'relationship' | 'quest' | 'skill_check' | 'system'; message: string; }
 
 export interface StoryEntryBase { id: string; createdAt: string; }
