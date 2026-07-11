@@ -25,9 +25,7 @@ describe('createChatProvider', () => {
     const body = JSON.parse(String(init.body)) as { model: string; response_format: { type: string } };
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/ai/chat');
     expect(body.model).toBe('lm-test');
-    expect(body
-48
-.response_format.type).toBe('text');
+    expect(body.response_format.type).toBe('text');
     expect(body).toMatchObject({ temperature: 0.65, top_p: 0.9, max_tokens: 250, frequency_penalty: 0.2, presence_penalty: 0.1 });
     expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
     vi.unstubAllGlobals();
@@ -85,4 +83,20 @@ describe('createChatProvider', () => {
     await expect(provider.analyzeRules({ playerText: 'Test', storyText: 'Story', game })).rejects.toThrow(/Bereinigter Inhalt/);
     vi.unstubAllGlobals();
   });
+
+  it('extracts narrative text from array-shaped assistant content', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ choices: [{ message: { content: [{ type: 'text', text: 'Erzähltext aus Array.' }] } }] })));
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = createChatProvider({ provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: 'lm-test', apiKey: '' });
+    await expect(provider.continueNarrative({ playerText: 'Test', game })).resolves.toBe('Erzähltext aus Array.');
+    vi.unstubAllGlobals();
+  });
+
+  it('rejects empty narrative responses with an actionable message', async () => {
+    stubChatContent('   ');
+    const provider = createChatProvider({ provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: 'lm-test', apiKey: '' });
+    await expect(provider.continueNarrative({ playerText: 'Test', game })).rejects.toThrow(/Story-KI hat keinen Erzählertext/);
+    vi.unstubAllGlobals();
+  });
+
 });

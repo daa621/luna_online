@@ -44,4 +44,10 @@ describe('playTurn', () => {
     expect(next.inventory).toEqual([]);
     expect(aiEntry?.kind === 'ai' ? aiEntry.invalidEvents?.some((event) => event.includes('Skill Check lock')) : false).toBe(true);
   });
+
+  it('stops the turn before applying rules when the narrative is empty', async () => {
+    const chat = provider([{ type: 'location_changed', location: 'Innenstadt' }], '   ');
+    await expect(playTurn(createInitialGame(setup), 'Gehe los', chat, images)).rejects.toThrow(/keinen Erzählertext/);
+  });
+
 });

@@ -27,6 +27,30 @@ function parseAiJsonContent<T>(content: string, parse: (value: unknown) => T, la
   }
 }
 
+function logAiDiagnostic(message: string, details: Record<string, unknown>) {
+  if (process.env.NODE_ENV !== 'production') console.info(`[AI Story RPG] ${message}`, details);
+}
+
+function extractAssistantContent(data: { choices?: Array<{ message?: { content?: unknown } }> }, label: string): string {
+  const content = data.choices?.[0]?.message?.content;
+  if (typeof content === 'string') {
+    logAiDiagnostic(`${label} empfangen`, { contentLength: content.length, trimmedLength: content.trim().length });
+    return content;
+  }
+  if (Array.isArray(content)) {
+    const text = content
+      .map((part) => {
+        if (part && typeof part === 'object' && 'text' in part && typeof (part as { text?: unknown }).text === 'string') return (part as { text: string }).text;
+        return '';
+      })
+      .join('');
+    logAiDiagnostic(`${label} aus Content-Array empfangen`, { partCount: content.length, contentLength: text.length, trimmedLength: text.trim().length });
+    return text;
+  }
+  logAiDiagnostic(`${label} ohne nutzbaren message.content`, { contentType: typeof content, hasChoices: Boolean(data.choices?.length) });
+  return '';
+}
+
 const responseSchema = z.object({
   storyText: z.string(),
   events: z.array(z.unknown()).optional(),
@@ -89,11 +113,13 @@ export class OpenAiCompatibleChatProvider implements ChatProvider {
       body: JSON.stringify({ model: this.model(), response_format: { type: responseFormatType }, messages, ...inference }),
     });
     if (!response.ok) throw new Error(`KI-Anfrage fehlgeschlagen (${response.status}): ${await response.text()} Prüfe: Läuft LM Studio? Ist der lokale Server aktiviert? Stimmt die URL? Ist ein Modell geladen?`);
-    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    return data.choices?.[0]?.message?.content ?? '';
+    const data = await response.json() as { choices?: Array<{ message?: { content?: unknown } }> };
+    return extractAssistantContent(data, responseFormatType === 'text' ? 'LLM-Textantwort' : 'LLM-JSON-Antwort');
   }
   async continueNarrative(request: NarrativeRequest): Promise<string> {
-    return this.chatCompletion([{ role: 'system', content: 'Du bist ein Erzähler. Schreibe nur Prosa oder Markdown, niemals JSON und keine Regelbegriffe.' }, { role: 'user', content: buildNarrativePrompt(request.game, request.playerText) }], 'text', this.config.narrativeInference ?? defaultNarrativeInference);
+    const storyText = await this.chatCompletion([{ role: 'system', content: 'Du bist ein Erzähler. Schreibe nur Prosa oder Markdown, niemals JSON und keine Regelbegriffe.' }, { role: 'user', content: buildNarrativePrompt(request.game, request.playerText) }], 'text', this.config.narrativeInference ?? defaultNarrativeInference);
+    if (!storyText.trim()) throw new Error('Die Story-KI hat keinen Erzählertext zurückgegeben. Prüfe in LM Studio, ob ein Chat-Modell geladen ist und ob das Modell auf die Anfrage antwortet.');
+    return storyText;
   }
   async analyzeRules(request: RuleAnalysisRequest): Promise<StructuredAiResponse> {
     const content = await this.chatCompletion([{ role: 'system', content: 'Du bist ein Regelanalyst. Antworte ausschließlich als JSON {"events":[...]} ohne Markdown.' }, { role: 'user', content: buildRuleAnalysisPrompt(request.game, request.playerText, request.storyText) }], this.responseFormatType(), this.config.ruleInference ?? defaultRuleInference);
