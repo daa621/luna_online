@@ -22,4 +22,19 @@ describe('SidePanel', () => {
     expect(screen.getByText(/Schlüssel finden \(2\/3\)/)).toBeInTheDocument();
     expect(screen.getByText('× 2')).toBeInTheDocument();
   });
+
+  it('places status and gameplay information before AI settings and actions', () => {
+    const { container } = render(<SidePanel game={baseGame} aiSettings={{ ...mockDefaults, model: 'mistralai/ministral-3-3b-mit-einem-sehr-langen-namen' }} onAiSettingsChange={noop} onSave={noop} onNew={noop} onDelete={noop} />);
+    const status = screen.getByText('Spielstatus');
+    const inventory = screen.getByText('Inventar');
+    const quests = screen.getByText('Quests');
+    const aiProvider = screen.getByText('KI-Provider');
+    const saveButton = screen.getByRole('button', { name: 'Spiel speichern' });
+    expect(status.compareDocumentPosition(inventory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(inventory.compareDocumentPosition(quests) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(quests.compareDocumentPosition(aiProvider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(aiProvider.compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector('.side-panel')).toBeInTheDocument();
+  });
+
 });
