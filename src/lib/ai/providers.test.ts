@@ -25,7 +25,10 @@ describe('createChatProvider', () => {
     const body = JSON.parse(String(init.body)) as { model: string; response_format: { type: string } };
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/ai/chat');
     expect(body.model).toBe('lm-test');
-    expect(body.response_format.type).toBe('text');
+    expect(body
+48
+.response_format.type).toBe('text');
+    expect(body).toMatchObject({ temperature: 0.65, top_p: 0.9, max_tokens: 250, frequency_penalty: 0.2, presence_penalty: 0.1 });
     expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
     vi.unstubAllGlobals();
   });
@@ -49,6 +52,18 @@ describe('createChatProvider', () => {
     const body = JSON.parse(String(init.body)) as { response_format: { type: string } };
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.openai.com/v1/chat/completions');
     expect(body.response_format.type).toBe('json_object');
+    vi.unstubAllGlobals();
+  });
+
+
+
+  it('keeps rule-analysis inference parameters independently configurable', async () => {
+    const fetchMock = stubChatContent(JSON.stringify({ events: [] }));
+    const provider = createChatProvider({ provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: 'lm-test', apiKey: '', narrativeInference: { temperature: 0.65 }, ruleInference: { temperature: 0.2, top_p: 0.7, max_tokens: 120 } });
+    await provider.analyzeRules({ playerText: 'Test', storyText: 'Story', game });
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(init.body)) as { temperature: number; top_p: number; max_tokens: number };
+    expect(body).toMatchObject({ temperature: 0.2, top_p: 0.7, max_tokens: 120 });
     vi.unstubAllGlobals();
   });
 

@@ -1,7 +1,8 @@
 import type { GameState, SkillCheckResult, StoryTurnEffect, StructuredAiResponse } from '@/lib/game/types';
 
 export type ChatResponseFormatType = 'text' | 'json_object' | 'json_schema';
-export interface ChatProviderConfig { provider: string; baseUrl?: string; apiKey?: string; model?: string; responseFormatType?: ChatResponseFormatType; }
+export interface InferenceParameters { temperature?: number; top_p?: number; max_tokens?: number; frequency_penalty?: number; presence_penalty?: number; }
+export interface ChatProviderConfig { provider: string; baseUrl?: string; apiKey?: string; model?: string; responseFormatType?: ChatResponseFormatType; narrativeInference?: InferenceParameters; ruleInference?: InferenceParameters; }
 export interface StoryTurnRequest { game: GameState; playerText: string; }
 export type NarrativeRequest = StoryTurnRequest;
 export interface RuleAnalysisRequest extends StoryTurnRequest { storyText: string; }
