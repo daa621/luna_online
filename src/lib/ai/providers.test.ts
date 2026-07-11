@@ -10,6 +10,12 @@ function stubChatContent(content: string) {
   return fetchMock;
 }
 
+function stubChatPayload(payload: unknown) {
+  const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify(payload)));
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
 describe('createChatProvider', () => {
   it('MockProvider supports narrative and rule analysis separately', async () => {
     const provider = new MockChatProvider();
@@ -26,7 +32,7 @@ describe('createChatProvider', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/ai/chat');
     expect(body.model).toBe('lm-test');
     expect(body.response_format.type).toBe('text');
-    expect(body).toMatchObject({ temperature: 0.65, top_p: 0.9, max_tokens: 250, frequency_penalty: 0.2, presence_penalty: 0.1 });
+    expect(body).toMatchObject({ temperature: 0.65, top_p: 0.9, max_tokens: 900, frequency_penalty: 0.2, presence_penalty: 0.1 });
     expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
     vi.unstubAllGlobals();
   });
@@ -95,7 +101,21 @@ describe('createChatProvider', () => {
   it('rejects empty narrative responses with an actionable message', async () => {
     stubChatContent('   ');
     const provider = createChatProvider({ provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: 'lm-test', apiKey: '' });
-    await expect(provider.continueNarrative({ playerText: 'Test', game })).rejects.toThrow(/Story-KI hat keinen Erzählertext/);
+    await expect(provider.continueNarrative({ playerText: 'Test', game })).rejects.toThrow(/message\.content/);
+    vi.unstubAllGlobals();
+  });
+
+  it('does not use reasoning_content as narrative text', async () => {
+    stubChatPayload({ choices: [{ message: { content: '', reasoning_content: 'Interne Gedanken, nicht anzeigen.' } }] });
+    const provider = createChatProvider({ provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: 'lm-test', apiKey: '' });
+    await expect(provider.continueNarrative({ playerText: 'Test', game })).rejects.toThrow(/reasoning_content geliefert/);
+    vi.unstubAllGlobals();
+  });
+
+  it('mentions finish_reason length when the narrative was cut off', async () => {
+    stubChatPayload({ choices: [{ message: { content: '', reasoning_content: 'Sehr lange interne Analyse.', finish_reason: 'length' } }] });
+    const provider = createChatProvider({ provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: 'lm-test', apiKey: '' });
+    await expect(provider.continueNarrative({ playerText: 'Test', game })).rejects.toThrow(/finish_reason: length/);
     vi.unstubAllGlobals();
   });
 

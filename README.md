@@ -63,7 +63,7 @@ Für LM Studio oder andere lokale OpenAI-kompatible Server wird `NEXT_PUBLIC_OPE
 
 ## Inferenzparameter
 
-Die Standardwerte für die Erzähler- und Regel-LLM-Aufrufe liegen zentral in `src/lib/ai/settings.ts`. Für den ersten LM-Studio-Test nutzt die Erzählerrolle `temperature: 0.65`, `top_p: 0.9`, `max_tokens: 250`, `frequency_penalty: 0.2` und `presence_penalty: 0.1`. Die Regelanalyse besitzt eigene, getrennte Defaults und wird nicht automatisch durch Änderungen an den Erzählerwerten verändert.
+Die Standardwerte für die Erzähler- und Regel-LLM-Aufrufe liegen zentral in `src/lib/ai/settings.ts`. Für den ersten LM-Studio-Test nutzt die Erzählerrolle `temperature: 0.65`, `top_p: 0.9`, `max_tokens: 900`, `frequency_penalty: 0.2` und `presence_penalty: 0.1`. Die Regelanalyse besitzt eigene, getrennte Defaults und wird nicht automatisch durch Änderungen an den Erzählerwerten verändert.
 
 ## Getrennte Story- und Regel-LLM-Aufrufe
 
