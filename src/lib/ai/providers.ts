@@ -87,7 +87,7 @@ export class OpenAiCompatibleChatProvider implements ChatProvider {
       method: 'POST', headers: this.headers(),
       body: JSON.stringify({ model: this.model(), response_format: { type: responseFormatType }, messages }),
     });
-    if (!response.ok) throw new Error(`KI-Anfrage fehlgeschlagen (${response.status}): ${await response.text()}`);
+    if (!response.ok) throw new Error(`KI-Anfrage fehlgeschlagen (${response.status}): ${await response.text()} Prüfe: Läuft LM Studio? Ist der lokale Server aktiviert? Stimmt die URL? Ist ein Modell geladen?`);
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
     return data.choices?.[0]?.message?.content ?? '';
   }

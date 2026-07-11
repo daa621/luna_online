@@ -26,6 +26,6 @@ export async function POST(request: Request) {
     if (!response.ok) return NextResponse.json({ error: `LM Studio /chat/completions antwortete mit HTTP ${response.status}.`, details: payload }, { status: response.status });
     return NextResponse.json(payload);
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? `LM Studio ist nicht erreichbar: ${err.message}` : 'LM Studio ist nicht erreichbar.' }, { status: 502 });
+    return NextResponse.json({ error: err instanceof Error ? `LM Studio ist nicht erreichbar: ${err.message}. Prüfe: Läuft LM Studio? Ist der lokale Server aktiviert? Stimmt die URL? Ist ein Modell geladen?` : 'LM Studio ist nicht erreichbar. Prüfe: Läuft LM Studio? Ist der lokale Server aktiviert? Stimmt die URL? Ist ein Modell geladen?' }, { status: 502 });
   }
 }
