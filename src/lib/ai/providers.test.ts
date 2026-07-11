@@ -25,7 +25,9 @@ describe('createChatProvider', () => {
     const body = JSON.parse(String(init.body)) as { model: string; response_format: { type: string } };
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/ai/chat');
     expect(body.model).toBe('lm-test');
-    expect(body.response_format.type).toBe('text');
+    expect(body
+48
+.response_format.type).toBe('text');
     expect(body).toMatchObject({ temperature: 0.65, top_p: 0.9, max_tokens: 250, frequency_penalty: 0.2, presence_penalty: 0.1 });
     expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
     vi.unstubAllGlobals();
